@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DYNAMICS - Towing & Lifting System</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 10px; }
+        .container { width: 100%; max-width: 1150px; background: #1e293b; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); padding: 20px; display: flex; flex-direction: column; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .header-title { font-size: 1.15rem; color: #38bdf8; font-weight: bold; }
+        .header-subtitle { font-size: 0.9rem; color: #f59e0b; font-weight: bold; }
+        
+        .content-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: stretch; }
+        
+        @media (max-width: 768px) { .content-grid { grid-template-columns: 1fr; } .header-top { flex-direction: column; gap: 4px; text-align: center; } }
+        .left-column { display: flex; flex-direction: column; gap: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 15px; justify-content: space-between; }
+        .right-column { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .canvas-container { position: relative; width: 100%; height: 450px; background: #090d16; border-radius: 12px; overflow: hidden; border: 2px solid #334155; }
+        canvas { display: block; width: 100%; height: 100%; }
+        .controls { display: flex; gap: 10px; }
+        button { flex: 1; background-color: #0284c7; color: white; border: none; padding: 12px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+        button:hover { background-color: #0369a1; }
+        button:active { transform: scale(0.98); }
+        .right-column h3 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        .question-box { font-size: 0.88rem; line-height: 1.5; color: #cbd5e1; margin-bottom: 10px; }
+        .options-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .option-item { background: #1e293b; border: 1px solid #475569; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: flex-start; gap: 8px; transition: background 0.2s; }
+        .option-item:hover { background: #334155; }
+        .option-item input { cursor: pointer; accent-color: #0284c7; margin-top: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-top">
+            <div class="header-title">DYNAMICS.</div>
+            <div class="header-subtitle">Wokib/Physics Deep Learning</div>
+        </div>
+        
+        <div class="content-grid">
+            <!-- Kolom Kiri (Animasi) -->
+            <div class="left-column">
+                <div class="canvas-container" id="canvasBox">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+                <div class="controls">
+                    <button id="startBtn" onclick="toggleAnimation()">Start</button>
+                    <button id="resetBtn" onclick="resetAnimation()">Reset</button>
+                </div>
+            </div>
+
+            <!-- Kolom Kanan (Soal) -->
+            <div class="right-column">
+                <div>
+                    <h3>Towing a Broken-Down Car</h3>
+                    <div class="question-box">
+                        <b>Klik Start dan perhatikan animasinya.</b><br>
+                        Dua mobil identik berwarna merah yang mogok sedang ditarik masing-masing oleh mobil lain dan sebuah helikopter dengan menggunakan tali yang juga identik. 
+                        <br><br>
+                        Pilih <b>dua (2) pernyataan yang benar</b> berdasarkan pengamatan Anda:
+                    </div>
+                    <div class="options-list" id="optionsContainer">
+                        <!-- Opsi A, B, C, D Tetap -->
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="A"> A. Gaya normal pada mobil bagian atas lebih kecil dibandingkan mobil bagian bawah karena adanya komponen gaya vertikal dari tali.</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="B"> B. Tegangan tali pada mobil bagian bawah sama persis dengan tegangan tali pada mobil bagian atas.</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="C"> C. Mobil bagian bawah bergerak lebih cepat karena seluruh gaya tarik tali digunakan untuk menggerakkan mobil secara horizontal.</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="D"> D. Sudut kemiringan tali pada helikopter membuat mobil bagian atas lebih cepat sampai di tujuan.</label>
+                        
+                        <!-- Opsi E Diperbarui -->
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="E"> E. Pada mobil bagian atas, tegangan talinya kecil karena sebagian gaya tarik helikopter "terbuang" ke arah vertikal untuk sedikit mengangkat mobil.</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvasSize() {
+            const box = document.getElementById('canvasBox');
+            canvas.width = box.clientWidth;
+            canvas.height = box.clientHeight;
+        }
+        initCanvasSize();
+        window.addEventListener('resize', initCanvasSize);
+
+        let animating = false;
+        let isPaused = false;
+        let timer = 0;
+        
+        // State untuk Mobil Derek (Bawah)
+        let carBottomX = 20; 
+        let velocityBottom = 0;
+        let wheelAngleBottom = 0;
+
+        // State untuk Helikopter (Atas)
+        let carTopX = 20; 
+        let velocityTop = 0;
+        let wheelAngleTop = 0;
+        let rotorAngle = 0;
+
+        // ==========================================
+        // SISTEM AUDIO (WEB AUDIO API)
+        // ==========================================
+        let audioCtx = null;
+        let heliOsc = null;
+        let heliLfo = null;
+        let heliGain = null;
+        let carHornOsc1 = null;
+        let carHornOsc2 = null;
+        let carHornGain = null;
+        let isAudioPlaying = false;
+
+        function startAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // 1. Suara Helikopter (Baling-baling)
+            heliOsc = audioCtx.createOscillator();
+            heliOsc.type = 'sawtooth';
+            heliOsc.frequency.setValueAtTime(45, audioCtx.currentTime);
+
+            heliLfo = audioCtx.createOscillator();
+            heliLfo.type = 'sine';
+            heliLfo.frequency.setValueAtTime(18, audioCtx.currentTime);
+
+            let heliLfoGain = audioCtx.createGain();
+            heliLfoGain.gain.setValueAtTime(15, audioCtx.currentTime);
+            
+            heliGain = audioCtx.createGain();
+            heliGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+
+            heliLfo.connect(heliLfoGain);
+            heliLfoGain.connect(heliOsc.frequency);
+
+            heliOsc.connect(heliGain);
+            heliGain.connect(audioCtx.destination);
+
+            heliOsc.start();
+            heliLfo.start();
+
+            // 2. Suara Klakson Mobil (Dua Nada)
+            carHornOsc1 = audioCtx.createOscillator();
+            carHornOsc1.type = 'square';
+            carHornOsc1.frequency.setValueAtTime(400, audioCtx.currentTime);
+
+            carHornOsc2 = audioCtx.createOscillator();
+            carHornOsc2.type = 'square';
+            carHornOsc2.frequency.setValueAtTime(500, audioCtx.currentTime);
+
+            carHornGain = audioCtx.createGain();
+            carHornGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+
+            carHornOsc1.connect(carHornGain);
+            carHornOsc2.connect(carHornGain);
+            carHornGain.connect(audioCtx.destination);
+
+            carHornOsc1.start();
+            carHornOsc2.start();
+
+            isAudioPlaying = true;
+            playHornRhythm();
+        }
+
+        function playHornRhythm() {
+            if (!isAudioPlaying || !audioCtx) return;
+            
+            let now = audioCtx.currentTime;
+            carHornGain.gain.cancelScheduledValues(now);
+            carHornGain.gain.setValueAtTime(0, now);
+            carHornGain.gain.linearRampToValueAtTime(0.05, now + 0.1); 
+            carHornGain.gain.setValueAtTime(0.05, now + 0.4);
+            carHornGain.gain.linearRampToValueAtTime(0, now + 0.5); 
+
+            setTimeout(playHornRhythm, 800);
+        }
+
+        function stopAudio() {
+            isAudioPlaying = false;
+            if (audioCtx) {
+                audioCtx.close().then(() => {
+                    audioCtx = null;
+                });
+            }
+        }
+        // ==========================================
+
+        function drawBackground(roadY, isTop) {
+            ctx.fillStyle = isTop ? '#0f172a' : '#1e293b'; 
+            ctx.fillRect(0, roadY - 120, canvas.width, 120); 
+            
+            let bgSpacing = 150; 
+            for(let i = 0; i < canvas.width / bgSpacing + 1; i++) {
+                let xPos = (i * bgSpacing) + 70; 
+                if (xPos > 0 && xPos < canvas.width) {
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(xPos, roadY - 50, 3, 50);
+                    ctx.fillRect(xPos - 10, roadY - 45, 24, 2);
+                }
+            }
+
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, roadY, canvas.width, 50);
+            
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, roadY); ctx.lineTo(canvas.width, roadY);
+            ctx.moveTo(0, roadY + 50); ctx.lineTo(canvas.width, roadY + 50);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([15, 15]); 
+            ctx.beginPath();
+            ctx.moveTo(0, roadY + 25); ctx.lineTo(canvas.width, roadY + 25);
+            ctx.stroke();
+            ctx.setLineDash([]); 
+        }
+
+        function drawScaledCar(x, y, colorBody, colorTop, scale, wheelAngle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+
+            let carW = 120;
+            let carH = 36;
+            let carY = -carH;
+
+            ctx.fillStyle = colorBody;
+            ctx.beginPath();
+            ctx.roundRect(0, carY + 11, carW, carH - 11, [5, 5, 3, 3]);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            ctx.fillStyle = colorTop;
+            ctx.beginPath();
+            ctx.roundRect(32, carY - 8, 54, 20, [7, 7, 0, 0]);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#93c5fd';
+            ctx.fillRect(37, carY - 5, 20, 12);
+            ctx.fillRect(61, carY - 5, 20, 12);
+
+            let wheelRadius = 10;
+            let wx1 = 24;
+            let wx2 = carW - 24;
+            let wy = carY + carH;
+
+            [wx1, wx2].forEach(wx => {
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(wx, wy, wheelRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(wx, wy);
+                ctx.rotate(wheelAngle);
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+                ctx.moveTo(0, -6); ctx.lineTo(0, 6);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        function drawScaledHelicopter(x, y, scale) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.moveTo(-10, -5); ctx.lineTo(-75, -2); ctx.lineTo(-75, 4); ctx.lineTo(-10, 6); ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1; ctx.stroke();
+
+            ctx.fillStyle = '#0369a1';
+            ctx.beginPath();
+            ctx.moveTo(-70, -12); ctx.lineTo(-78, -14); ctx.lineTo(-75, 4); ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.save(); ctx.translate(-74, -4); ctx.rotate(rotorAngle * 2.5);
+            ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke(); ctx.restore();
+
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath(); ctx.ellipse(15, 2, 45, 22, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.stroke();
+
+            ctx.fillStyle = '#93c5fd';
+            ctx.beginPath();
+            ctx.moveTo(30, -15); ctx.quadraticCurveTo(55, -8, 52, 12); ctx.lineTo(25, 12); ctx.closePath();
+            ctx.fill(); ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 1; ctx.stroke();
+
+            ctx.fillStyle = '#64748b'; ctx.fillRect(12, -22, 6, 8);
+            ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.save(); ctx.translate(15, -22); ctx.rotate(rotorAngle);
+            ctx.moveTo(-90, 0); ctx.lineTo(90, 0); ctx.moveTo(-60, 0); ctx.lineTo(60, 0); ctx.stroke(); ctx.restore();
+
+            ctx.strokeStyle = '#64748b'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(5, 18); ctx.lineTo(10, 26); ctx.moveTo(28, 18); ctx.lineTo(23, 26); ctx.stroke();
+            ctx.beginPath(); ctx.roundRect(-8, 26, 48, 4, [2, 2, 2, 2]); ctx.fillStyle = '#475569'; ctx.fill(); ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let topRoadY = 130;
+            let bottomRoadY = 340;
+
+            // ================= ATAS: HELIKOPTER =================
+            drawBackground(topRoadY, true);
+            
+            let scaleTop = 0.65; 
+            let hoverOffset = Math.sin(timer * 0.05) * 5;
+            
+            let heliX = carTopX + (160 * scaleTop); 
+            let heliY = topRoadY - 80 + hoverOffset; 
+
+            drawScaledHelicopter(heliX, heliY, scaleTop);
+
+            let carTopHookX = carTopX + (120 * scaleTop);
+            let carTopHookY = topRoadY - (15 * scaleTop);
+            let heliHookX = heliX + (5 * scaleTop);
+            let heliHookY = heliY + (24 * scaleTop);
+
+            ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(carTopHookX, carTopHookY); ctx.lineTo(heliHookX, heliHookY); ctx.stroke();
+
+            ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.moveTo(carTopHookX, carTopHookY); ctx.lineTo(carTopHookX + 40, carTopHookY); ctx.stroke(); ctx.setLineDash([]);
+
+            let dx = heliHookX - carTopHookX;
+            let dy = heliHookY - carTopHookY;
+            let angleRad = Math.atan2(dy, dx);
+            let arcRadius = 18;
+            ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(carTopHookX, carTopHookY, arcRadius, 0, -Math.abs(angleRad), true); ctx.stroke();
+
+            ctx.fillStyle = '#f59e0b'; ctx.font = 'bold 14px sans-serif';
+            let midRad = -Math.abs(angleRad) / 2;
+            ctx.fillText("θ", carTopHookX + (arcRadius + 10) * Math.cos(midRad), carTopHookY + (arcRadius + 10) * Math.sin(midRad) + 4);
+
+            drawScaledCar(carTopX, topRoadY, '#e11d48', '#be123c', scaleTop, wheelAngleTop);
+
+
+            // ================= BAWAH: MOBIL DEREK =================
+            drawBackground(bottomRoadY, false);
+            
+            let scaleBottom = 0.65;
+            let towTruckX = carBottomX + (160 * scaleBottom);
+
+            drawScaledCar(towTruckX, bottomRoadY, '#0284c7', '#0369a1', scaleBottom, wheelAngleBottom);
+
+            ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(carBottomX + (120 * scaleBottom), bottomRoadY - (18 * scaleBottom));
+            ctx.lineTo(towTruckX, bottomRoadY - (18 * scaleBottom));
+            ctx.stroke();
+
+            drawScaledCar(carBottomX, bottomRoadY, '#e11d48', '#be123c', scaleBottom, wheelAngleBottom);
+        }
+
+        function animateLoop() {
+            if (!animating || isPaused) return;
+            timer++;
+
+            let targetVelBottom = 1.2; 
+            let targetVelTop = 0.5;    
+
+            velocityBottom += (targetVelBottom - velocityBottom) * 0.02;
+            velocityTop += (targetVelTop - velocityTop) * 0.02;
+
+            carBottomX += velocityBottom;
+            carTopX += velocityTop;
+
+            wheelAngleBottom += velocityBottom * 0.08;
+            wheelAngleTop += velocityTop * 0.08;
+            rotorAngle += 0.3; 
+
+            if (carBottomX > canvas.width - 150) {
+                animating = false;
+                document.getElementById('startBtn').innerText = "Start";
+                stopAudio(); 
+            }
+
+            drawScene();
+
+            if (animating) {
+                requestAnimationFrame(animateLoop);
+            }
+        }
+
+        function toggleAnimation() {
+            const btn = document.getElementById('startBtn');
+            if (!animating) {
+                if (carBottomX > canvas.width - 150) resetAnimation(); 
+                animating = true;
+                isPaused = false;
+                btn.innerText = "Pause";
+                startAudio(); 
+                requestAnimationFrame(animateLoop);
+            } else {
+                isPaused = !isPaused;
+                if (isPaused) {
+                    btn.innerText = "Resume";
+                    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); 
+                } else {
+                    btn.innerText = "Pause";
+                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
+                    requestAnimationFrame(animateLoop);
+                }
+            }
+        }
+
+        function resetAnimation() {
+            animating = false;
+            isPaused = false;
+            timer = 0;
+            carBottomX = 20; 
+            carTopX = 20; 
+            velocityBottom = 0;
+            velocityTop = 0;
+            wheelAngleBottom = 0;
+            wheelAngleTop = 0;
+            rotorAngle = 0;
+            document.getElementById('startBtn').innerText = "Start";
+            
+            stopAudio(); 
+            drawScene();
+        }
+
+        resetAnimation();
+    </script>
+</body>
+</html>

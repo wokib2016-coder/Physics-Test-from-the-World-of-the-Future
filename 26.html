@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DYNAMICS - Tank & Projectile</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 10px; }
+        .container { width: 100%; max-width: 1150px; background: #1e293b; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); padding: 20px; display: flex; flex-direction: column; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .header-title { font-size: 1.15rem; color: #38bdf8; font-weight: bold; }
+        .header-subtitle { font-size: 0.9rem; color: #f59e0b; font-weight: bold; }
+        
+        /* Kolom Animasi (Kiri) Lebih Sempit, Kolom Soal (Kanan) Lebih Lebar */
+        .content-grid { display: grid; grid-template-columns: 0.85fr 1.35fr; gap: 20px; align-items: stretch; }
+        
+        @media (max-width: 768px) { .content-grid { grid-template-columns: 1fr; } .header-top { flex-direction: column; gap: 4px; text-align: center; } }
+        
+        .left-column { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; }
+        .right-column { display: flex; flex-direction: column; gap: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 15px; justify-content: space-between; }
+        
+        .canvas-container { position: relative; width: 100%; height: 420px; background: #090d16; border-radius: 12px; overflow: hidden; border: 2px solid #334155; }
+        canvas { display: block; width: 100%; height: 100%; }
+        .controls { display: flex; gap: 10px; }
+        button { flex: 1; background-color: #0284c7; color: white; border: none; padding: 10px; font-size: 0.95rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+        button:hover { background-color: #0369a1; }
+        button:active { transform: scale(0.98); }
+        .right-column h3 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        .question-box { font-size: 0.86rem; line-height: 1.45; color: #cbd5e1; margin-bottom: 10px; }
+        .options-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+        .option-item { background: #1e293b; border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: flex-start; gap: 6px; transition: background 0.2s; }
+        .option-item:hover { background: #334155; }
+        .option-item input { cursor: pointer; accent-color: #0284c7; margin-top: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-top">
+            <div class="header-title">DYNAMICS</div>
+            <div class="header-subtitle">Wokib/Physics Deep Learning</div>
+        </div>
+        
+        <div class="content-grid">
+            <!-- KOLOM KIRI: Animasi & Tombol -->
+            <div class="left-column">
+                <div class="canvas-container" id="canvasBox">
+                    <canvas id="simCanvas"></canvas>
+                </div>
+                <div class="controls">
+                    <button id="startBtn" onclick="toggleAnimation()">Start</button>
+                    <button id="resetBtn" onclick="resetAnimation()">Reset</button>
+                </div>
+            </div>
+
+            <!-- KOLOM KANAN: Soal & Pilihan Ganda -->
+            <div class="right-column">
+                <div>
+                    <h3>The Tank and the Bird</h3>
+                    <div class="question-box">
+                        <b>Klik Start dan perhatikan animasinya.</b><br>
+                        Seorang tentara di atas tank baja yang bergerak lincah menembakkan peluru lurus ke atas tepat saat seekor burung sedang terbang di atasnya. Peluru melesat meninggalkan senapan dengan kecepatan 50 m/s dan nyaris mengenai burung. Yang memprihatinkan peluru justru jatuh Kembali tepat menimpa tank hingga timbul ledakan.
+                        <br><br>
+                        Pilih <b>dua (2) pernyataan yang benar</b> berdasarkan pengamatan Anda:
+                    </div>
+                    <div class="options-list" id="optionsContainer">
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="A"> A. Burung terbang pada ketinggian 125 m di atas tank.</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="B"> B. Peluru tak mengenai burung karena kepakan sayapnya membelokkan arah peluru</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="C"> C. Tank meledak 10 detik setelah peluru melesat meninggalkan senapan</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="D"> D. Peluru meleset ke samping burung karena adanya gaya dorong angin dari tank</label>
+                        <label class="option-item"><input type="checkbox" name="quizOption" value="E"> E. Tank baja meledak karena peluru yang jatuh kehilangan seluruh kecepatan horizontalnya</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvasSize() {
+            const box = document.getElementById('canvasBox');
+            canvas.width = box.clientWidth;
+            canvas.height = box.clientHeight;
+        }
+        initCanvasSize();
+        window.addEventListener('resize', initCanvasSize);
+
+        // --- VARIABEL SIMULASI FISIKA ---
+        let animating = false;
+        let isPaused = false;
+        let simTime = 0;       
+        let lastTimestamp = 0;
+
+        const TIME_SCALE = 0.8; 
+        let groundY = 350; 
+        let startX = 30;
+
+        // State Tank 
+        let tankX = startX; 
+        const TANK_SPEED = 75; 
+        let tankTreadAngle = 0;
+
+        // State Burung (Posisi awal digeser ke kiri agar ledakan tidak mepet kanan)
+        let birdX = 240; 
+        let birdY = 35; 
+        let birdWingAngle = 0;
+        let birdSpeed = -50; 
+
+        // State Peluru
+        let bulletX = 0;
+        let bulletY = 0;
+        let bulletVx = 0;
+        let bulletVy = 0;
+        let isFired = false;
+        let bulletTrail = [];
+
+        // State Ledakan
+        let isExploded = false;
+        let explosionParticles = [];
+        let explosionFlash = 0;
+
+        // Audio
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playShootSound() {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+            osc.type = 'square'; osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }
+        function playExplosionSound() {
+            if (!audioCtx) return;
+            let bufferSize = audioCtx.sampleRate * 1.5; 
+            let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            let data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            let noise = audioCtx.createBufferSource(); noise.buffer = buffer;
+            let filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 1.2);
+            let gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+            noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, canvas.width, groundY); 
+            ctx.fillStyle = '#1e293b'; ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            ctx.strokeStyle = '#334155'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(canvas.width, groundY); ctx.stroke();
+        }
+
+        function drawTank(x, y) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.roundRect(0, -20, 80, 24, [10]); ctx.fill();
+            ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.save(); ctx.beginPath(); ctx.roundRect(0, -20, 80, 24, [10]); ctx.clip();
+            ctx.strokeStyle = '#475569'; ctx.lineWidth = 3;
+            for (let i = -24; i < 100; i += 10) {
+                let offset = (tankTreadAngle % 10);
+                ctx.beginPath(); ctx.moveTo(i + offset, -20); ctx.lineTo(i + offset, 4); ctx.stroke();
+            }
+            ctx.restore();
+            ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.roundRect(5, -35, 70, 18, [3]); ctx.fill();
+            ctx.strokeStyle = '#064e3b'; ctx.stroke();
+            ctx.fillStyle = '#166534'; ctx.beginPath(); ctx.roundRect(25, -50, 30, 15, [5, 5, 0, 0]); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#475569'; ctx.fillRect(38, -70, 6, 20);
+            ctx.fillStyle = '#fcd34d'; ctx.beginPath(); ctx.arc(30, -55, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#4b5563'; ctx.beginPath(); ctx.arc(30, -58, 6, Math.PI, 0); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawBird(x, y) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = '#facc15'; ctx.strokeStyle = '#ca8a04'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(15, 2); ctx.lineTo(10, 4); ctx.fill();
+            let wingY = Math.sin(birdWingAngle) * 10;
+            ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(-5, -18 + wingY, -15, -5); ctx.quadraticCurveTo(-5, 0, 0, 0);
+            ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+
+        function drawBullet() {
+            if (!isFired) return;
+            
+            // Jejak Peluru Parabola
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)'; 
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]); 
+            ctx.beginPath();
+            for(let i=0; i<bulletTrail.length-1; i++) {
+                ctx.moveTo(bulletTrail[i].x, bulletTrail[i].y);
+                ctx.lineTo(bulletTrail[i+1].x, bulletTrail[i+1].y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]); 
+
+            // Peluru
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath(); ctx.arc(bulletX, bulletY, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0;
+
+            // Garis Bantu Horizontal
+            if (bulletVy > 0) {
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; 
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(birdX, birdY); 
+                ctx.lineTo(bulletX, birdY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function drawExplosion() {
+            if (!isExploded) return;
+            if (explosionFlash > 0) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${explosionFlash})`;
+                ctx.beginPath(); ctx.arc(tankX + 40, groundY - 20, 120, 0, Math.PI * 2); ctx.fill();
+            }
+            explosionParticles.forEach(p => {
+                ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawBird(birdX, birdY);
+            drawTank(tankX, groundY);
+            drawBullet();
+            drawExplosion();
+        }
+
+        function updatePhysics(dt) {
+            tankX += TANK_SPEED * dt;
+            tankTreadAngle += TANK_SPEED * dt * 0.6;
+
+            birdX += birdSpeed * dt;
+            birdY = 35; 
+            birdWingAngle += dt * 25;
+
+            // Tembakan terjadi saat posisi burung tepat di atas tank
+            if (!isFired && birdX < tankX + 40 && birdX > tankX + 20 && simTime > 0.4) {
+                isFired = true;
+                playShootSound();
+                bulletX = tankX + 41;
+                bulletY = groundY - 70;
+                bulletVx = 0; 
+                bulletVy = -380; 
+                bulletTrail = []; 
+            }
+
+            if (isFired && !isExploded) {
+                bulletX = tankX + 41; 
+                bulletVy += 300 * dt; 
+                bulletY += bulletVy * dt;
+
+                bulletTrail.push({x: bulletX, y: bulletY});
+
+                // Peluru jatuh menimpa tank
+                if (bulletVy > 0 && bulletY >= groundY - 70) {
+                    isExploded = true;
+                    explosionFlash = 1.0;
+                    playExplosionSound();
+                    createExplosion(bulletX, groundY - 50);
+                }
+            }
+
+            if (isExploded) {
+                if (explosionFlash > 0) explosionFlash -= dt * 2;
+                explosionParticles.forEach(p => {
+                    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 150 * dt; p.size -= dt * 4;
+                });
+            }
+        }
+
+        function createExplosion(x, y) {
+            explosionParticles = [];
+            let colors = ['#ef4444', '#f97316', '#f59e0b', '#facc15', '#78350f'];
+            for (let i = 0; i < 80; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = Math.random() * 200 + 50;
+                explosionParticles.push({
+                    x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 100,
+                    size: Math.random() * 15 + 5, color: colors[Math.floor(Math.random() * colors.length)]
+                });
+            }
+        }
+
+        function animateLoop(timestamp) {
+            if (!animating || isPaused) {
+                lastTimestamp = timestamp;
+                requestAnimationFrame(animateLoop);
+                return;
+            }
+
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            let rawDt = (timestamp - lastTimestamp) / 1000; 
+            lastTimestamp = timestamp;
+
+            let dt = rawDt * TIME_SCALE;
+            simTime += dt;
+            
+            updatePhysics(dt);
+            drawScene();
+
+            if (simTime > 4.5) {
+                animating = false;
+                document.getElementById('startBtn').innerText = "Start";
+            } else {
+                requestAnimationFrame(animateLoop);
+            }
+        }
+
+        function toggleAnimation() {
+            const btn = document.getElementById('startBtn');
+            if (!animating) {
+                if (simTime > 4.5) resetAnimation(); 
+                animating = true; isPaused = false; lastTimestamp = 0; 
+                btn.innerText = "Pause"; initAudio();
+                requestAnimationFrame(animateLoop);
+            } else {
+                isPaused = !isPaused;
+                if (isPaused) { btn.innerText = "Resume"; if (audioCtx) audioCtx.suspend(); }
+                else { btn.innerText = "Pause"; if (audioCtx) audioCtx.resume(); lastTimestamp = 0; requestAnimationFrame(animateLoop); }
+            }
+        }
+
+        function resetAnimation() {
+            animating = false; isPaused = false; simTime = 0; lastTimestamp = 0;
+            tankX = startX; tankTreadAngle = 0;
+            birdX = 240; birdY = 35; birdWingAngle = 0;
+            isFired = false; bulletTrail = []; isExploded = false; explosionParticles = []; explosionFlash = 0;
+            document.getElementById('startBtn').innerText = "Start";
+            drawScene();
+        }
+
+        resetAnimation();
+    </script>
+</body>
+</html>
